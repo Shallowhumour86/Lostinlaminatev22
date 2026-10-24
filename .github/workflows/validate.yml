@@ -1,0 +1,20 @@
+name: Godot 4.7.2 validation
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verified engine and import project
+        env:
+          GODOT_INSTALL_DIR: /tmp/lil-godot
+          XDG_DATA_HOME: /tmp/lil-runtime/data
+          XDG_CONFIG_HOME: /tmp/lil-runtime/config
+          XDG_CACHE_HOME: /tmp/lil-runtime/cache
+        run: ./tools/setup.sh
+      - name: Play through integration scenarios
+        env:
+          GODOT_BIN: /tmp/lil-godot/Godot_v4.7.2-stable_linux.x86_64
+        run: ./tools/test.sh

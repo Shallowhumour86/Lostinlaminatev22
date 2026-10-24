@@ -18,5 +18,6 @@ func _process(_delta: float) -> bool:
 	if frames==25:
 		root.get_texture().get_image().save_png("/tmp/lil-title.png")
 		game.queue_free()
+	if frames==40:
 		quit()
 	return false

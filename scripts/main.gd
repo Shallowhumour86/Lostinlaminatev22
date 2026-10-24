@@ -24,8 +24,6 @@ var toast_label: Label
 var toast_time: float = 0.0
 var sidebar: Label
 var audio: AudioStreamPlayer
-var audio_playback: AudioStreamGeneratorPlayback
-var audio_phase: float = 0.0
 var muted: bool = false
 var ui: CanvasLayer
 var pending: String = ""
@@ -165,7 +163,6 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	toast_time -= delta
 	if toast_time < 0: toast_label.text = ""
-	_fill_audio()
 	if not modal.visible and ending.is_empty():
 		var direction := Vector2(float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)),float(Input.is_physical_key_pressed(KEY_S))-float(Input.is_physical_key_pressed(KEY_W)))
 		direction += Vector2(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_UP)))
@@ -489,27 +486,29 @@ func _valid_save(data: Variant) -> bool:
 	return true
 
 func _build_audio() -> void:
-	# Headless validation has no listener and does not need an audio buffer.
+	# Synthesize an original, seamless eight-second ambient loop in memory.
 	if DisplayServer.get_name()=="headless": return
+	var mix_rate := 22050
+	var frame_count := mix_rate*8
+	var samples := PackedByteArray()
+	samples.resize(frame_count*2)
+	for i in range(frame_count):
+		var t := float(i)/mix_rate
+		var wave := (sin(TAU*110*t)+sin(TAU*165*t)*0.4+sin(TAU*220*t)*0.22)*0.15
+		wave *= 0.7+sin(TAU*t/8.0)*0.15
+		samples.encode_s16(i*2,int(clampf(wave,-1,1)*32767))
+	var sound := AudioStreamWAV.new()
+	sound.format = AudioStreamWAV.FORMAT_16_BITS
+	sound.mix_rate = mix_rate
+	sound.data = samples
+	sound.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	sound.loop_begin = 0
+	sound.loop_end = frame_count
 	audio = AudioStreamPlayer.new()
-	var generator := AudioStreamGenerator.new()
-	generator.mix_rate = 22050
-	generator.buffer_length = 0.15
-	audio.stream = generator
+	audio.stream = sound
 	audio.volume_db = -23
 	add_child(audio)
 	audio.play()
-	audio_playback = audio.get_stream_playback()
-
-func _fill_audio() -> void:
-	if audio_playback == null: return
-	var count := mini(audio_playback.get_frames_available(),4096)
-	for i in range(count):
-		audio_phase += 1.0/22050.0
-		var t := audio_phase
-		var wave := (sin(TAU*110*t)+sin(TAU*164.81*t)*0.4+sin(TAU*220*t)*0.22)*0.15
-		wave *= 0.7+sin(t*0.4)*0.15
-		audio_playback.push_frame(Vector2(wave,wave))
 
 func _draw() -> void:
 	# Original vector art: diamond tiles, architecture and animated characters.
@@ -644,4 +643,3 @@ func _beacon(p: Vector2, color: Color) -> void:
 
 func _exit_tree() -> void:
 	if audio != null: audio.stop()
-	audio_playback = null
